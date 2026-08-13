@@ -6,7 +6,7 @@ Full build plan (auth flow, tool design, deployment): `~/.claude/plans/robust-sp
 Project notes/change log: [Ninjacart MCP Hub Obsidian vault](https://github.com/Jerseyno07/ninjacart-mcp-hub-notes).
 
 ## Status
-Scaffolding only — directory structure and config files are in place; auth/MCP/tool implementation is in progress. See the notes vault's `05 - Change Log.md` for progress.
+**Live**: `https://ninjacart-mcp-hub-production.up.railway.app`, deployed on Railway (auto-deploys from `main`). Full auth flow (Google sign-in → role check → token → authenticated tool call) and `query_packtrack_db` verified working in production. `search_packtrack_knowledge` still needs `EMBEDDING_API_KEY` set on Railway and `node src/knowledge/ingest.js --project packtrack` run against it. See the notes vault's `05 - Change Log.md` for full history.
 
 ## Notable choices
 - **ESM (`"type": "module"`), not CommonJS** — unlike PackTrack Pro. `@modelcontextprotocol/sdk` and its examples are ESM-first; this avoids interop friction.
