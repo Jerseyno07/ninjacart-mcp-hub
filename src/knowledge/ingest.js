@@ -37,7 +37,7 @@ async function main() {
     const chunks = splitMarkdown(text, file);
     if (chunks.length === 0) continue;
 
-    const embeddings = await embedTexts(chunks.map((c) => c.content));
+    const embeddings = await embedTexts(chunks.map((c) => c.content), 'document');
     const chunksWithEmbeddings = chunks.map((c, i) => ({ ...c, embedding: embeddings[i] }));
 
     await replaceFileChunks(project, file, chunksWithEmbeddings);

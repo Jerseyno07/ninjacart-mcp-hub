@@ -74,7 +74,7 @@ export function register(mcpServer) {
       const projects = extra.authInfo?.extra?.projects ?? [];
       if (!projects.includes(PROJECT_NAME)) return projectGateError();
 
-      const embedding = await embedText(query);
+      const embedding = await embedText(query, 'query');
       const results = await searchKnowledge(embedding, PROJECT_NAME, 6);
       log('packtrack_knowledge_search', { email, query, topScore: results[0]?.score ?? null });
 
