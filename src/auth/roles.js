@@ -3,6 +3,8 @@
 // packtrack-pro's own role model so they carry the same meaning.
 export const ROLES = {
   'aranyanandi@ninjacart.com': { role: 'ADMIN', projects: ['packtrack'] },
+  'umeshjampani@ninjacart.com': { role: 'ADMIN', projects: ['packtrack'] },
+  'sayanbhowmik@ninjacart.com': { role: 'ADMIN', projects: ['packtrack'] },
   // 'someone@ninjacart.com': { role: 'PM_STORE_EXEC', projects: ['packtrack'] },
 };
 
