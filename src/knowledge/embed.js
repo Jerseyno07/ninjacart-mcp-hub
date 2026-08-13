@@ -6,7 +6,13 @@ import OpenAI from 'openai';
 const EMBEDDING_MODEL = 'text-embedding-3-small';
 export const EMBEDDING_DIMENSIONS = 1536;
 
-const client = new OpenAI({ apiKey: process.env.EMBEDDING_API_KEY });
+// Constructed lazily, not at import time — the server must be able to boot
+// (and serve query_packtrack_db) even before EMBEDDING_API_KEY is set.
+let client;
+function getClient() {
+  if (!client) client = new OpenAI({ apiKey: process.env.EMBEDDING_API_KEY });
+  return client;
+}
 
 export async function embedText(text) {
   const [vector] = await embedTexts([text]);
@@ -14,7 +20,7 @@ export async function embedText(text) {
 }
 
 export async function embedTexts(texts) {
-  const response = await client.embeddings.create({
+  const response = await getClient().embeddings.create({
     model: EMBEDDING_MODEL,
     input: texts,
   });
