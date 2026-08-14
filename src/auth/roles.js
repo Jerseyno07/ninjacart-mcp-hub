@@ -5,6 +5,7 @@ export const ROLES = {
   'aranyanandi@ninjacart.com': { role: 'ADMIN', projects: ['packtrack'] },
   'umeshjampani@ninjacart.com': { role: 'ADMIN', projects: ['packtrack'] },
   'sayanbhowmik@ninjacart.com': { role: 'ADMIN', projects: ['packtrack'] },
+  'vishalb@ninjacart.com': { role: 'ADMIN', projects: ['packtrack'] },
   // 'someone@ninjacart.com': { role: 'PM_STORE_EXEC', projects: ['packtrack'] },
 };
 
