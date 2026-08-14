@@ -1,5 +1,8 @@
-// In-memory Map + TTL sweep. Fine for short TTLs (minutes) and a single Railway
-// instance — see README/CLAUDE.md for the single-replica tradeoff this implies.
+// In-memory Map + TTL sweep for short-lived (minutes), low-consequence state:
+// pending Google logins and one-time authorization codes. Fine to lose on a
+// restart (user just retries) — still single-Railway-instance-only, see
+// README/CLAUDE.md. Longer-lived state (registered clients, refresh tokens)
+// lives in Postgres instead — see db.js.
 
 class TtlMap {
   constructor(sweepIntervalMs = 60_000) {
@@ -43,9 +46,9 @@ const PENDING_AUTHORIZATION_TTL_MS = 10 * 60 * 1000;
 export const authorizationCodes = new TtlMap();
 const AUTHORIZATION_CODE_TTL_MS = 2 * 60 * 1000;
 
-// Dynamic Client Registration — registered MCP client apps. No TTL: a client
-// stays registered for the life of the process.
-export const registeredClients = new Map();
+// Dynamic Client Registration — registered MCP client apps now live in
+// Postgres (src/auth/db.js: oauth_clients), not here, so they survive
+// redeploys. See db.js's upsertClient/getClient.
 
 export function storePendingAuthorization(state, record) {
   pendingAuthorizations.set(state, record, PENDING_AUTHORIZATION_TTL_MS);

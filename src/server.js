@@ -10,6 +10,7 @@ import { requireBearerAuth } from '@modelcontextprotocol/sdk/server/auth/middlew
 
 import { router as authRoutes } from './auth/routes.js';
 import { verifyAccessToken } from './auth/tokenVerifier.js';
+import { ensureAuthSchema } from './auth/db.js';
 import { createMcpServer } from './mcp/mcpServer.js';
 import { log } from './util/logger.js';
 
@@ -35,7 +36,7 @@ const oauthMetadata = {
   token_endpoint: new URL('/token', issuerUrl).toString(),
   registration_endpoint: new URL('/register', issuerUrl).toString(),
   response_types_supported: ['code'],
-  grant_types_supported: ['authorization_code'],
+  grant_types_supported: ['authorization_code', 'refresh_token'],
   code_challenge_methods_supported: ['S256'],
   token_endpoint_auth_methods_supported: ['none'],
 };
@@ -118,6 +119,15 @@ app.post('/mcp', authMiddleware, mcpPostHandler);
 app.get('/mcp', authMiddleware, mcpGetHandler);
 app.delete('/mcp', authMiddleware, mcpDeleteHandler);
 
-app.listen(PORT, () => {
-  log('server_started', { port: PORT });
-});
+// Creates oauth_clients/refresh_tokens tables if they don't exist yet —
+// zero manual migration step on deploy, same pattern as knowledge/store.js.
+ensureAuthSchema()
+  .then(() => {
+    app.listen(PORT, () => {
+      log('server_started', { port: PORT });
+    });
+  })
+  .catch((err) => {
+    console.error('Failed to initialize auth schema:', err);
+    process.exit(1);
+  });

@@ -6,8 +6,8 @@ import { signAccessToken } from './jwt.js';
 import {
   storePendingAuthorization, takePendingAuthorization,
   storeAuthorizationCode, takeAuthorizationCode,
-  registeredClients,
 } from './tokenStore.js';
+import { upsertClient, getClient, issueRefreshToken, consumeRefreshToken } from './db.js';
 import { log } from '../util/logger.js';
 
 export const router = express.Router();
@@ -102,10 +102,10 @@ function base64url(input) {
 
 // ── GET /authorize ──────────────────────────────────────────────────────
 // MCP client sends client_id, redirect_uri, code_challenge, code_challenge_method, state, resource.
-router.get('/authorize', (req, res) => {
+router.get('/authorize', async (req, res) => {
   const { client_id, redirect_uri, code_challenge, code_challenge_method, state, resource } = req.query;
 
-  const client = registeredClients.get(client_id);
+  const client = await getClient(client_id);
   if (!client) {
     return res.status(400).send(page('Unknown client', '<p>This MCP client is not registered with this server. Ask it to register again.</p>', { icon: 'error' }));
   }
@@ -186,29 +186,53 @@ router.get('/oauth/callback', async (req, res) => {
 });
 
 // ── POST /token ─────────────────────────────────────────────────────────
-router.post('/token', express.urlencoded({ extended: false }), (req, res) => {
-  const { grant_type, code, code_verifier } = req.body;
+router.post('/token', express.urlencoded({ extended: false }), async (req, res) => {
+  const { grant_type, code, code_verifier, refresh_token } = req.body;
 
-  if (grant_type !== 'authorization_code') {
-    return res.status(400).json({ error: 'unsupported_grant_type' });
+  if (grant_type === 'authorization_code') {
+    const record = takeAuthorizationCode(code);
+    if (!record) {
+      return res.status(400).json({ error: 'invalid_grant', error_description: 'Code is missing, expired, or already used.' });
+    }
+
+    const computedChallenge = base64url(crypto.createHash('sha256').update(code_verifier || '').digest());
+    if (computedChallenge !== record.codeChallenge) {
+      return res.status(400).json({ error: 'invalid_grant', error_description: 'PKCE verification failed.' });
+    }
+
+    const accessToken = signAccessToken(record.email, record.role, record.projects, record.clientId);
+    const refreshToken = await issueRefreshToken(record.email, record.clientId);
+    return res.json({ access_token: accessToken, refresh_token: refreshToken, token_type: 'Bearer', expires_in: 3600 });
   }
 
-  const record = takeAuthorizationCode(code);
-  if (!record) {
-    return res.status(400).json({ error: 'invalid_grant', error_description: 'Code is missing, expired, or already used.' });
+  if (grant_type === 'refresh_token') {
+    if (!refresh_token) {
+      return res.status(400).json({ error: 'invalid_request', error_description: 'refresh_token is required.' });
+    }
+
+    const result = await consumeRefreshToken(refresh_token);
+    if (!result) {
+      return res.status(400).json({ error: 'invalid_grant', error_description: 'Refresh token is missing, expired, or already used.' });
+    }
+
+    // Re-derive role/projects live rather than trusting anything from the old
+    // token — if the account was removed from roles.js since it last signed
+    // in, the refresh fails here instead of silently reissuing stale access.
+    const roleEntry = getRole(result.email);
+    if (!roleEntry) {
+      log('oauth_refresh_no_role_assigned', { email: result.email });
+      return res.status(400).json({ error: 'invalid_grant', error_description: 'Account no longer has access to this MCP server.' });
+    }
+
+    const accessToken = signAccessToken(result.email, roleEntry.role, roleEntry.projects, result.clientId);
+    return res.json({ access_token: accessToken, refresh_token: result.newRefreshToken, token_type: 'Bearer', expires_in: 3600 });
   }
 
-  const computedChallenge = base64url(crypto.createHash('sha256').update(code_verifier || '').digest());
-  if (computedChallenge !== record.codeChallenge) {
-    return res.status(400).json({ error: 'invalid_grant', error_description: 'PKCE verification failed.' });
-  }
-
-  const accessToken = signAccessToken(record.email, record.role, record.projects, record.clientId);
-  res.json({ access_token: accessToken, token_type: 'Bearer', expires_in: 3600 });
+  return res.status(400).json({ error: 'unsupported_grant_type' });
 });
 
 // ── POST /register (Dynamic Client Registration) ───────────────────────
-router.post('/register', express.json(), (req, res) => {
+router.post('/register', express.json(), async (req, res) => {
   const { client_name, redirect_uris } = req.body;
 
   if (!Array.isArray(redirect_uris) || redirect_uris.length === 0) {
@@ -223,7 +247,7 @@ router.post('/register', express.json(), (req, res) => {
     token_endpoint_auth_method: 'none',
     client_id_issued_at: Math.floor(Date.now() / 1000),
   };
-  registeredClients.set(clientId, client);
+  await upsertClient(client);
 
   res.status(201).json(client);
 });
