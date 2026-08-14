@@ -14,7 +14,7 @@ export async function verifyAccessToken(token) {
     decoded = verifyJwt(token);
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
-      throw new InvalidTokenError('Access token expired — sign in again to get a new one.');
+      throw new InvalidTokenError('Access token expired - sign in again to get a new one.');
     }
     throw new InvalidTokenError('Invalid access token.');
   }
